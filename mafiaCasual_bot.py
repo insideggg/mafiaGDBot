@@ -6,7 +6,7 @@ from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 import threading
 import random
 
-bot = telebot.TeleBot("7444461797:AAHP48qoahuBElUVZGTE8dQXJ4ia-X0hAEQ")
+bot = telebot.TeleBot("TOKEN HERE")
 
 game_state = {
     "players": {},
