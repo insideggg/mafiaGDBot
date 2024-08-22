@@ -93,6 +93,7 @@ def handle_night_choice(call):
         bot.answer_callback_query(call.id, "Sheriff has made his choice!")
 
         #add sheriff kill/check action +handler
+        #here must be markup
 
     if all([game_state["mafia_choice"], game_state["doctor_choice"], game_state["sheriff_choice"]]):
         process_night_choices(call.message.chat.id)
