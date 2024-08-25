@@ -92,7 +92,7 @@ def handle_night_choice(call):
         game_state["sheriff_choice"] = target_id
         bot.answer_callback_query(call.id, "Sheriff has made his choice!")
 
-        #add sheriff kill/check action +handler
+        #add sheriff kill/check action (inlineKeyboardMarkup) +handler if action "Kill" change choosed player "alive": False, if check: send privately to Sheriff in chat is choiced player mafia or not
         #here must be markup
 
     if all([game_state["mafia_choice"], game_state["doctor_choice"], game_state["sheriff_choice"]]):
@@ -128,6 +128,8 @@ def process_night_choices(chat_id):
         reset_game()
         return
 
+    start_day(chat_id)
+
 
 def reset_game():
     game_state["players"].clear()
@@ -137,4 +139,38 @@ def reset_game():
     game_state["registration_active"] = True
 
 
+def start_day(chat_id):
+    bot.send_message(chat_id, "The day begins! Discuss and prepare to vote! You have 45 seconds.")
+    threading.Timer(45.0, start_day_vote, [chat_id]).start()
+
+
+def start_day_vote(chat_id):
+    alive_players = [player_info["name"] for player_info in game_state["players"].values() if player_info["alive"]]
+    poll_mgs = bot.send_poll(
+        chat_id=chat_id,
+        question="Who is the Mafia?",
+        options=alive_players,
+        is_anonymous=True
+    )
+    bot.register_next_step_handler(poll_mgs, handle_day_vote)
+
+
+def handle_day_vote(poll):
+    winning_option = max(poll.options, key=lambda opt: opt.voter_count).text
+    losing_player = None
+
+    for player_id, player_info in game_state["players"].items():
+        if player_info["name"] == winning_option:
+            losing_player = player_id
+            break
+
+    game_state["players"][losing_player]["alive"] = False
+
+    if game_state["players"][losing_player]["role"] == "Mafia":
+        bot.send_message(poll.chat.id, f"{winning_option} was a Mafia! Peaceful people win the game!")
+    else:
+        bot.send_message(poll.chat.id, f"{winning_option} has been voted out but he/she was a {game_state["players"][losing_player]["role"]}!")
+        start_night(poll.chat.id)
+
+#booting bot
 bot.polling()
