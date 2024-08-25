@@ -84,16 +84,44 @@ def handle_night_choice(call):
 
     if role == "Mafia":
         game_state["mafia_choice"] = target_id
-        bot.answer_callback_query(call.id, "Mafia has made their choice!")
+        bot.answer_callback_query(call.id, "You have made your choice!")
+        bot.send_message(call.message.chat.id, f"Mafia has made their choice!")
     elif role == "Doctor":
         game_state["doctor_choice"] = target_id
-        bot.answer_callback_query(call.id, "Doctor has made his choice!")
+        bot.answer_callback_query(call.id, "You have made your choice!")
+        bot.send_message(call.message.chat.id, f"Doctor has made their choice!")
     elif role == "Sheriff":
         game_state["sheriff_choice"] = target_id
-        bot.answer_callback_query(call.id, "Sheriff has made his choice!")
+        bot.answer_callback_query(call.id)
 
         #add sheriff kill/check action (inlineKeyboardMarkup) +handler if action "Kill" change choosed player "alive": False, if check: send privately to Sheriff in chat is choiced player mafia or not
         #here must be markup
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("Kill", callback_data="SheriffAction_Kill"))
+        markup.add(InlineKeyboardButton("Check Player", callback_data="SheriffAction_Check"))
+        bot.send_message(call.from_user.id, "Do you want to Kill or Check the player?", reply_markup=markup)
+
+    # if all([game_state["mafia_choice"], game_state["doctor_choice"], game_state["sheriff_choice"]]):
+    #     process_night_choices(call.message.chat.id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("SheriffAction_"))
+def handle_sheriff_action(call):
+    action = call.data.split("_")[1]
+
+    sheriff_target = game_state["sheriff_choice"]
+    sheriff_target_info = game_state["players"][sheriff_target]
+
+    if action == "Kill":
+        # send directly to group chat
+        sheriff_target_info["alive"] = False
+        bot.send_message(call.message.chat.id, f"Sheriff has made their choice!")
+    elif action == "Check":
+        # send privately to Sheriff chat
+        is_mafia = sheriff_target_info["role"] == "Mafia"
+        bot.send_message(call.from_user.id, f"{sheriff_target_info["name"]} is {"Mafia" if is_mafia else "not Mafia"}!")
+
+    bot.answer_callback_query(call.id, "You has made your choice!")
 
     if all([game_state["mafia_choice"], game_state["doctor_choice"], game_state["sheriff_choice"]]):
         process_night_choices(call.message.chat.id)
