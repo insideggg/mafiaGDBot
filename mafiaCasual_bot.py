@@ -27,6 +27,15 @@ def handle_register(call):
         }
         bot.answer_callback_query(call.id, 'You have registered for the game')
 
+
+def get_alive_players_list():
+    alive_players = []
+    for player_id, player_info in game_state["players"].items():
+        if player_info["alive"]:
+            alive_players.append(f"{len(alive_players) + 1}. [{player_info['name']}](tg://user?id={player_id})")
+    return "\n".join(alive_players)
+
+
 @bot.message_handler(commands=['start_game'])
 def start_game(message):
     markup = InlineKeyboardMarkup()
@@ -43,17 +52,31 @@ def register_player(call):
 
 
 def end_registration(chat_id):
+    if len(game_state["players"]) < 4:
+        bot.send_message(chat_id, "Not enough players to start the game. You need at least 4 players.")
+        return
+
     game_state["registration_active"] = False
 
     player_ids = list(game_state["players"].keys())
+    player_count = len(player_ids)
+
+    roles = []
+    if player_count == 4:
+        roles = ["Mafia", "Peaceful Person", "Peaceful Person", "Doctor"]
+    elif 4 < player_count <= 7:
+        roles = ["Mafia", "Doctor"] + ["Peaceful Person"] * (player_count - 2)
+    elif player_count > 7:
+        # HERE TWO MAFIA NEEDS TO HANDLE GROUP CHOICE LOGIC
+        roles = ["Mafia", "Mafia", "Doctor", "Sheriff"] + ["Peaceful Person"] * (player_count - 4)
     random.shuffle(player_ids)
-    random.shuffle(game_state["roles"])
+    random.shuffle(roles)
 
     for i, player_id in enumerate(player_ids):
-        role = game_state["roles"][i % len(game_state["roles"])]
-        game_state["players"][player_id]["role"] = role
-
-        bot.send_message(player_id, f"Your role is: {role}")
+        # role = game_state["roles"][i % len(game_state["roles"])]
+        # game_state["players"][player_id]["role"] = role
+        game_state["players"][player_id]["role"] = roles[i]
+        bot.send_message(player_id, f"Your role is: {roles[i]}")
 
     bot.send_message(chat_id, "Registration is complete! Roles have been assigned!")
 
@@ -61,7 +84,9 @@ def end_registration(chat_id):
 
 
 def start_night(chat_id):
-    bot.send_message(chat_id, open('night.jpg', 'rb'), caption="The night starts!")
+    # bot.send_message(chat_id, open('night.jpg', 'rb'), caption="The night starts!")
+    alive_players_list = get_alive_players_list()
+    bot.send_message(chat_id, f"The night starts!\n\nAlive players:\n{alive_players_list}", parse_mode="Markdown")
 
     for player_id, player_info in game_state["players"].items():
         if player_info["role"] in ["Mafia", "Sheriff", "Doctor"] and player_info["alive"]:
@@ -156,6 +181,14 @@ def process_night_choices(chat_id):
         reset_game()
         return
 
+    alive_players = [player for player in game_state["players"].values() if player["alive"]]
+    alive_mafia = any(player["role"] == "Mafia" and player["alive"] for player in game_state["players"].values())
+
+    if len(alive_players) == 1 and alive_mafia:
+        bot.send_message(chat_id, f"The Mafia wins! Only one player remains!")
+        reset_game()
+        return
+
     start_day(chat_id)
 
 
@@ -168,7 +201,10 @@ def reset_game():
 
 
 def start_day(chat_id):
-    bot.send_message(chat_id, "The day begins! Discuss and prepare to vote! You have 45 seconds.")
+    alive_players_list = get_alive_players_list()
+    bot.send_message(chat_id, f"The day starts!\n\nAlive players:\n{alive_players_list}", parse_mode="Markdown")
+
+    bot.send_message(chat_id, "Discuss and prepare to vote! You have 45 seconds.")
     threading.Timer(45.0, start_day_vote, [chat_id]).start()
 
 
